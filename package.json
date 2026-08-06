@@ -1,0 +1,31 @@
+{
+  "name": "fit-tube",
+  "version": "1.0.0",
+  "description": "Backend project for a health Oriented video streaming platform.",
+  "keywords": [
+    "FitTube",
+    "Backend",
+    "MERN",
+    "Healthy"
+  ],
+  "license": "ISC",
+  "author": "Shahzad-eth",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "format": "prettier --write \"src/**/*.js",
+    "formatCheck": "prettier --check \"src/**/*.js"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14",
+    "prettier": "^3.9.6"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mongoose": "^9.9.1"
+  }
+}
