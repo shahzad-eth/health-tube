@@ -1,4 +1,4 @@
-import {ApiError} from "../utlils/api-error";
+import {ApiError} from "../utlils/api-error.js";
 import mongoose from "mongoose";
 
 const errorHandler = (err, req, res, next) => {
