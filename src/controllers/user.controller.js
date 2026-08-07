@@ -2,7 +2,7 @@ import {asyncHandler} from "../utlils/async-handler.js";
 import {User} from "../models/user.model.js";
 import {ApiResponse} from "../utlils/api-response.js";
 import {ApiError} from "../utlils/api-error.js";
-import {uploadOnCloudinary} from "../utlils/cloudinary.js";
+import {uploadOnCloudinary, deleteFromCloudinary} from "../utlils/cloudinary.js";
 
 const registerUser = asyncHandler(async (req, res) => {
   const {fullName, username, email, password} = req.body;
@@ -55,27 +55,41 @@ const registerUser = asyncHandler(async (req, res) => {
     }
   }
 
-  const user = await User.create({
-    fullName,
-    username: username.toLowerCase(),
-    email,
-    password,
-    avatar: avatar?.url,
-    coverImage: coverImage?.url || "",
-  });
+  try {
+    const user = await User.create({
+      fullName,
+      username: username.toLowerCase(),
+      email,
+      password,
+      avatar: avatar?.url,
+      coverImage: coverImage?.url || "",
+    });
+  
+    const createdUser = await User.findById(user._id).select(
+      "-password -refreshToken",
+    );
+  
+    if (!createdUser) {
+      console.log("Somthing went wrong while creating the user");
+      throw new ApiError(500, "Somthing went wrong while creating the user");
+    }
+  
+    return res
+      .status(200)
+      .json(new ApiResponse(201, createdUser, "User registered succesfully"));
+  } catch (error) {
+    console.log("User creation failed")
+    
+    if(avatar){
+        await deleteFromCloudinary(avatar.public_id)
+    }
 
-  const createdUser = await User.findById(user._id).select(
-    "-password -refreshToken",
-  );
+    if(coverImage){
+        await deleteFromCloudinary(coverImage.public_id)
+    }
 
-  if (!createdUser) {
-    console.log("Somthing went wrong while creating the user");
-    throw new ApiError(500, "Somthing went wrong while creating the user");
+    throw new ApiError(500, "Somthing went wrong while creating the user and images were deleted.");
   }
-
-  return res
-    .status(200)
-    .json(new ApiResponse(201, createdUser, "User registered succesfully"));
 });
 
 export {registerUser};
