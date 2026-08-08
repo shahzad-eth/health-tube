@@ -166,25 +166,20 @@ const loginUser = asyncHandler(async (req, res) => {
     );
 });
 
-const logOutUser = asyncHandler( async(req, res)=>{
+const logOutUser = asyncHandler(async (req, res) => {
   await User.findByIdAndUpdate(
     req.user_id,
     {
-      $set:{refreshToken :''}
+      $set: {refreshToken: ""},
     },
-    {returnDocument:"after"}
-  )
-})
+    {returnDocument: "after"},
+  );
+  return res.status(200).json(new ApiResponse(200, {}, "Logout successful"));
+});
 
-return res
-.status(200)
-.json(
-  new ApiResponse(200,{},"Logout successful")
-)
+const refreshAccessToken = asyncHandler(async (req, res) => {
+  const {incomingRefreshToken} = req.body.refreshToken;
 
-const refreshAccessToken = asyncHandler(async (req, res)=>{
-  const {incomingRefreshToken} = req.body.refreshToken
-  
   if (!incomingRefreshToken) {
     console.log("Refresh token is missing");
     throw new ApiError(400, "Refresh token is missing");
@@ -193,43 +188,39 @@ const refreshAccessToken = asyncHandler(async (req, res)=>{
   try {
     const decodedToken = jwt.verify(
       incomingRefreshToken,
-      process.env.REFRESH_TOKEN_SECRET
-    )
+      process.env.REFRESH_TOKEN_SECRET,
+    );
 
-    const user = await User.findById(decodedToken?._id)
+    const user = await User.findById(decodedToken?._id);
 
     if (!user) {
-    console.log("Invalid refresh Token");
-    throw new ApiError(401, "Invalid refresh Token");
-  }
+      console.log("Invalid refresh Token");
+      throw new ApiError(401, "Invalid refresh Token");
+    }
 
-  if(incomingRefreshToken !== user?.refreshToken){
-    console.log("Invalid refresh Token");
-    throw new ApiError(401, "Invalid refresh Token");
-  }
+    if (incomingRefreshToken !== user?.refreshToken) {
+      console.log("Invalid refresh Token");
+      throw new ApiError(401, "Invalid refresh Token");
+    }
 
-  const {accessToken, refreshToken: newRefreshToken} = await generateAccessAndRefreshToken(user._id)
+    const {accessToken, refreshToken: newRefreshToken} =
+      await generateAccessAndRefreshToken(user._id);
 
-  user.refreshToken = newRefreshToken;
-  await user.save({validateBeforeSave:false})
+    user.refreshToken = newRefreshToken;
+    await user.save({validateBeforeSave: false});
 
-  return res
-  .status(200)
-  .json(
-    new ApiResponse(
-      200,
-      { accessToken,refreshToken: newRefreshToken},
-      "New refresh token generated successfully"
-    )
-  )
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          {accessToken, refreshToken: newRefreshToken},
+          "New refresh token generated successfully",
+        ),
+      );
   } catch (error) {
     throw new ApiError(500, "Something went wron while generating JWT tokens");
   }
+});
 
-})
-
-export {
-  registerUser, 
-  loginUser,
-  refreshAccessToken
-};
+export {registerUser, loginUser, refreshAccessToken};
