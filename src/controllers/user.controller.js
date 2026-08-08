@@ -2,7 +2,34 @@ import {asyncHandler} from "../utlils/async-handler.js";
 import {User} from "../models/user.model.js";
 import {ApiResponse} from "../utlils/api-response.js";
 import {ApiError} from "../utlils/api-error.js";
-import {uploadOnCloudinary, deleteFromCloudinary} from "../utlils/cloudinary.js";
+import {
+  uploadOnCloudinary,
+  deleteFromCloudinary,
+} from "../utlils/cloudinary.js";
+
+const generateAccessAndRefreshToken = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+
+    if (!user) {
+      console.log("User doesn't exists with id :", userId);
+      return res.status(200).json(new ApiError(404, "User doesn't exists"));
+    }
+
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
+
+    user.refreshToken = refreshToken;
+    await user.save({validateBeforeSave: false});
+
+    return {
+      accessToken,
+      refreshToken,
+    };
+  } catch (error) {
+    throw new ApiError(500, "Something went wron while generating JWT tokens");
+  }
+};
 
 const registerUser = asyncHandler(async (req, res) => {
   const {fullName, username, email, password} = req.body;
@@ -64,32 +91,78 @@ const registerUser = asyncHandler(async (req, res) => {
       avatar: avatar?.url,
       coverImage: coverImage?.url || "",
     });
-  
+
     const createdUser = await User.findById(user._id).select(
       "-password -refreshToken",
     );
-  
+
     if (!createdUser) {
       console.log("Somthing went wrong while creating the user");
       throw new ApiError(500, "Somthing went wrong while creating the user");
     }
-  
+
     return res
       .status(200)
       .json(new ApiResponse(201, createdUser, "User registered succesfully"));
   } catch (error) {
-    console.log("User creation failed")
-    
-    if(avatar){
-        await deleteFromCloudinary(avatar.public_id)
+    console.log("User creation failed");
+
+    if (avatar) {
+      await deleteFromCloudinary(avatar.public_id);
     }
 
-    if(coverImage){
-        await deleteFromCloudinary(coverImage.public_id)
+    if (coverImage) {
+      await deleteFromCloudinary(coverImage.public_id);
     }
 
-    throw new ApiError(500, "Somthing went wrong while creating the user and images were deleted.");
+    throw new ApiError(
+      500,
+      "Somthing went wrong while creating the user and images were deleted.",
+    );
   }
 });
 
-export {registerUser};
+const loginUser = asyncHandler(async (req, res) => {
+  const {username, email, password} = req.body;
+
+  if (!email || !password) {
+    console.log("All fields are required");
+    throw new ApiError(400, "All fields are required");
+  }
+
+  const user = await User.findOne({
+    $or: [{email}, {username}],
+  });
+
+  if (!user) {
+    console.log("User doesn't exists");
+    throw new ApiError(404, "User doesn't exists");
+  }
+
+  const correctPassword = await user.isPasswordCorrect(password);
+
+  if (!correctPassword) {
+    console.log("Password id invalid");
+    throw new ApiError(400, "Password id invalid");
+  }
+
+  const {accessToken, refreshToken} = await generateAccessAndRefreshToken(
+    user._id,
+  );
+
+  const loggedInUser = await User.findById(user._id).select(
+    "-password -refreshToken",
+  );
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        {loggedInUser, accessToken, refreshToken},
+        "Login successful",
+      ),
+    );
+});
+
+export {registerUser, loginUser};
