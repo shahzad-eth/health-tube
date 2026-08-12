@@ -92,7 +92,7 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
         from: "users",
         localField: "subscriber",
         foreignField: "_id",
-        as: "subscriberList",
+        as: "subscriber",
         pipeline: [
           {
             $project: {
@@ -106,8 +106,15 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
       },
     },
     {
-      $unwind: "$subscriberList",
+      $unwind: "$subscriber",
     },
+    {
+      $addFields:{
+        channelCount:{
+          $size:"$subscriber"
+        }
+      }
+    }
   ]);
 
   if (!subscribersList.length) {
@@ -169,6 +176,13 @@ const getSubscribedChannels = asyncHandler(async (req, res) => {
     {
       $unwind: "$channel",
     },
+    {
+      $addFields:{
+        channelCount:{
+          $size:"$channel"
+        }
+      }
+    }
   ]);
 
   if (!channels.length) {
@@ -181,4 +195,4 @@ const getSubscribedChannels = asyncHandler(async (req, res) => {
 });
 
 
-export {toggleSubscription, getUserChannelSubscribers, getSubscribedChannels};
+export {createSubscription,deleteSubscription, getUserChannelSubscribers, getSubscribedChannels};
