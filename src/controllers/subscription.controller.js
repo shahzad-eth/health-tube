@@ -69,11 +69,116 @@ const deleteSubscription = asyncHandler(async (req, res) => {
 // controller to return subscriber list of a channel
 const getUserChannelSubscribers = asyncHandler(async (req, res) => {
   const {channelId} = req.params;
+  const loggedInUser = req.user?._id;
+
+  if (!isValidObjectId(channelId)) {
+    console.log("Channel Id is not valid");
+    throw new ApiError(400, "Channel Id is not valid");
+  }
+
+  if (loggedInUser.toString() !== channelId.toString()) {
+    console.log("Access Denied");
+    throw new ApiError(403, "Access Denied");
+  }
+
+  const subscribersList = await Subscription.aggregate([
+    {
+      $match: {
+        channel: new mongoose.Types.ObjectId(channelId),
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "subscriber",
+        foreignField: "_id",
+        as: "subscriberList",
+        pipeline: [
+          {
+            $project: {
+              _id: 0,
+              username: 1,
+              fullName: 1,
+              avatar: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $unwind: "$subscriberList",
+    },
+  ]);
+
+  if (!subscribersList.length) {
+    return res
+      .status(200)
+      .json(new ApiResponse(200, [], "No subscribers yet."));
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        subscribersList,
+        "Subscribers list fetched successfully",
+      ),
+    );
 });
 
 // controller to return channel list to which user has subscribed
 const getSubscribedChannels = asyncHandler(async (req, res) => {
   const {subscriberId} = req.params;
+  const loggedInUser = req.user?._id;
+
+  if (!isValidObjectId(subscriberId)) {
+    console.log("User Id is not valid");
+    throw new ApiError(400, "User Id is not valid");
+  }
+
+  if (subscriberId.toString() !== loggedInUser.toString()) {
+    console.log("Access Denied");
+    throw new ApiError(403, "Access Denied");
+  }
+
+  const channels = await Subscription.aggregate([
+    {
+      $match: {
+        subscriber: new mongoose.Types.ObjectId(subscriberId),
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "channel",
+        foreignField: "_id",
+        as: "channel",
+        pipeline: [
+          {
+            $project: {
+              _id: 0,
+              username: 1,
+              fullName: 1,
+              avatar: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $unwind: "$channel",
+    },
+  ]);
+
+  if (!channels.length) {
+    return res.status(200).json(new ApiResponse(200, [], "No subscription yet!"));
+  
+    return res
+      .status(200)
+      .json(new ApiResponse(200, channels, "Subscriptions fetched successfully"));
+  }
 });
+
 
 export {toggleSubscription, getUserChannelSubscribers, getSubscribedChannels};
