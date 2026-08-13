@@ -109,12 +109,12 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
       $unwind: "$subscriber",
     },
     {
-      $addFields:{
-        channelCount:{
-          $size:"$subscriber"
-        }
-      }
-    }
+      $addFields: {
+        channelCount: {
+          $size: "$subscriber",
+        },
+      },
+    },
   ]);
 
   if (!subscribersList.length) {
@@ -177,22 +177,30 @@ const getSubscribedChannels = asyncHandler(async (req, res) => {
       $unwind: "$channel",
     },
     {
-      $addFields:{
-        channelCount:{
-          $size:"$channel"
-        }
-      }
-    }
+      $addFields: {
+        channelCount: {
+          $size: "$channel",
+        },
+      },
+    },
   ]);
 
   if (!channels.length) {
-    return res.status(200).json(new ApiResponse(200, [], "No subscription yet!"));
-  
     return res
       .status(200)
-      .json(new ApiResponse(200, channels, "Subscriptions fetched successfully"));
+      .json(new ApiResponse(200, [], "No subscription yet!"));
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(200, channels, "Subscriptions fetched successfully"),
+      );
   }
 });
 
-
-export {createSubscription,deleteSubscription, getUserChannelSubscribers, getSubscribedChannels};
+export {
+  createSubscription,
+  deleteSubscription,
+  getUserChannelSubscribers,
+  getSubscribedChannels,
+};

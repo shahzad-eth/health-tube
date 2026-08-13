@@ -19,21 +19,19 @@ const publishAVideo = asyncHandler(async (req, res) => {
 const getVideoById = asyncHandler(async (req, res) => {
   const {videoId} = req.params;
 
-  if(!isValidObjectId(videoId)){
-    throw new ApiError(400,"Invalid video Id")
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid video Id");
   }
 
-  const video = await Video.findById(videoId)
-  
-  if(!video){
-    throw new ApiError(404, "Video not found")
+  const video = await Video.findById(videoId);
+
+  if (!video) {
+    throw new ApiError(404, "Video not found");
   }
 
   return res
-  .status(200)
-  .json(
-    new ApiResponse(200, video,"Video fetched successfully")
-  )
+    .status(200)
+    .json(new ApiResponse(200, video, "Video fetched successfully"));
 });
 
 const updateVideo = asyncHandler(async (req, res) => {
@@ -43,55 +41,54 @@ const updateVideo = asyncHandler(async (req, res) => {
 
 const deleteVideo = asyncHandler(async (req, res) => {
   const {videoId} = req.params;
-  
-  if(!isValidObjectId(videoId)){
-    throw new ApiError(400, "Invalid video Id")
+
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid video Id");
   }
 
-  await Video.findByIdAndDelete(videoId)
-  
+  await Video.findByIdAndDelete(videoId);
+
   return res
-  .status(200)
-  .json(
-    new ApiResponse(200,{},"Video deleted successfull")
-  )
+    .status(200)
+    .json(new ApiResponse(200, {}, "Video deleted successfull"));
 });
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
   const {videoId} = req.params;
   const loggedInUser = req.user?._id;
 
-  if(!isValidObjectId(videoId)){
-    throw new ApiError(400,"Invalid video Id")
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid video Id");
   }
 
-  if(!isValidObjectId(loggedInUser)){
-    throw new ApiError(401, "Access Denied")
-  }
-  
-  const video = await Video.findOne(
-    {
-      _id: new mongoose.Types.ObjectId(videoId),
-      owner: new mongoose.Types.ObjectId(loggedInUser)
-    }
-  )
-
-  if(!video){
-    throw new ApiError(404, "Video not found or you do not have permission")
+  if (!isValidObjectId(loggedInUser)) {
+    throw new ApiError(401, "Access Denied");
   }
 
-  video.ispublished = !video.ispublished
+  const video = await Video.findOne({
+    _id: new mongoose.Types.ObjectId(videoId),
+    owner: new mongoose.Types.ObjectId(loggedInUser),
+  });
 
-  await video.save({validateBeforeSave:false})
+  if (!video) {
+    throw new ApiError(404, "Video not found or you do not have permission");
+  }
+
+  video.ispublished = !video.ispublished;
+
+  await video.save({validateBeforeSave: false});
 
   return res
-  .status(200)
-  .json(
-    new ApiResponse(200, {ispublished:video.ispublished}, video.ispublished 
-      ? "Video published Successfully"
-      : "Video is now private"
-    )
-  )
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        {ispublished: video.ispublished},
+        video.ispublished
+          ? "Video published Successfully"
+          : "Video is now private",
+      ),
+    );
 });
 
 export {
