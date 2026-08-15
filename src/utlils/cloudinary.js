@@ -1,6 +1,7 @@
 import {v2 as cloudinary} from "cloudinary";
 import fs from "fs";
 import dotenv from "dotenv";
+import {format} from "path";
 
 dotenv.config();
 
@@ -23,10 +24,11 @@ const uploadOnCloudinary = async (localFilePath) => {
     return response;
   } catch (error) {
     console.error("Cloudinary Upload Error:", error);
+    return null;
+  } finally{
     if (fs.existsSync(localFilePath)) {
       fs.unlinkSync(localFilePath);
     }
-    return null;
   }
 };
 
@@ -39,4 +41,23 @@ const deleteFromCloudinary = async (publicId) => {
   }
 };
 
-export {uploadOnCloudinary, deleteFromCloudinary};
+const getVideoThumbnail = (publicId) => {
+  try {
+    const thumbnail = cloudinary.url(publicId, {
+      resource_type: "video",
+      format: "jpg",
+      transformation: [
+        {start_offset: "auto"},
+        {width: 720, crop: "scale"},
+        {quality: "auto", fetch_format: "auto"},
+      ],
+    });
+  
+    return thumbnail;
+  } catch (error) {
+    console.log("Error getting thumbnail :", error)
+    throw error;
+  }
+};
+
+export {uploadOnCloudinary, deleteFromCloudinary, getVideoThumbnail};
