@@ -5,6 +5,8 @@ import {ApiError} from "../utils/ApiError.js";
 import {ApiResponse} from "../utils/ApiResponse.js";
 import {asyncHandler} from "../utils/asyncHandler.js";
 import {uploadOnCloudinary} from "../utils/cloudinary.js";
+import { getVideoThumbnail } from "../utlils/cloudinary.js";
+import fs from "fs";
 
 const getAllVideos = asyncHandler(async (req, res) => {
   const {page = 1, limit = 10, query, sortBy, sortType, userId} = req.query;
@@ -14,6 +16,48 @@ const getAllVideos = asyncHandler(async (req, res) => {
 const publishAVideo = asyncHandler(async (req, res) => {
   const {title, description} = req.body;
   // TODO: get video, upload to cloudinary, create video
+  const loggedInUser = req.user?._id;
+  
+  if(!title || !description){
+    if(req.file?.path) fs.unlinkSync(req.file.path)
+      throw new ApiError(400, "Title and description are required")
+  }
+
+  const videoLocalPath = req.file?.path;
+
+  if(!videoLocalPath){
+    console.log("Video file is missing")
+    throw new ApiError(404, "Video file is missing")
+  }
+
+  let uploadedVideo;
+   try {
+    uploadedVideo = await uploadOnCloudinary(videoLocalPath)
+    console.log("Video uploaded")
+   } catch (error) {
+    throw new ApiError(400,"Error while uploading the file ", error)
+   }
+
+   if(!uploadedVideo){
+    throw new ApiError(400,"Error while uploading the file ")
+   }
+
+   const thumbnail = getVideoThumbnail(uploadedVideo.public_id)
+
+   const video = await Video.create({
+    videoFile: uploadedVideo?.secure_url,
+    thumbnail,
+    owner: new mongoose.Types.ObjectId(loggedInUser),
+    title,
+    description,
+    duration:uploadedVideo.duration
+   })
+
+   return res
+   .status(200)
+   .json(
+    new ApiResponse(200, video, "Video uploaded successfully")
+   )
 });
 
 const getVideoById = asyncHandler(async (req, res) => {
