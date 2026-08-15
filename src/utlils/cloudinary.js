@@ -25,7 +25,7 @@ const uploadOnCloudinary = async (localFilePath) => {
   } catch (error) {
     console.error("Cloudinary Upload Error:", error);
     return null;
-  } finally{
+  } finally {
     if (fs.existsSync(localFilePath)) {
       fs.unlinkSync(localFilePath);
     }
@@ -52,10 +52,10 @@ const getVideoThumbnail = (publicId) => {
         {quality: "auto", fetch_format: "auto"},
       ],
     });
-  
+
     return thumbnail;
   } catch (error) {
-    console.log("Error getting thumbnail :", error)
+    console.log("Error getting thumbnail :", error);
     throw error;
   }
 };

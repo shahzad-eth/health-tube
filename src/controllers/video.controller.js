@@ -5,7 +5,7 @@ import {ApiError} from "../utils/ApiError.js";
 import {ApiResponse} from "../utils/ApiResponse.js";
 import {asyncHandler} from "../utils/asyncHandler.js";
 import {uploadOnCloudinary} from "../utils/cloudinary.js";
-import { getVideoThumbnail } from "../utlils/cloudinary.js";
+import {getVideoThumbnail} from "../utlils/cloudinary.js";
 import fs from "fs";
 
 const getAllVideos = asyncHandler(async (req, res) => {
@@ -15,49 +15,46 @@ const getAllVideos = asyncHandler(async (req, res) => {
 
 const publishAVideo = asyncHandler(async (req, res) => {
   const {title, description} = req.body;
-  // TODO: get video, upload to cloudinary, create video
   const loggedInUser = req.user?._id;
-  
-  if(!title || !description){
-    if(req.file?.path) fs.unlinkSync(req.file.path)
-      throw new ApiError(400, "Title and description are required")
+
+  if (!title || !description) {
+    if (req.file?.path) fs.unlinkSync(req.file.path);
+    throw new ApiError(400, "Title and description are required");
   }
 
   const videoLocalPath = req.file?.path;
 
-  if(!videoLocalPath){
-    console.log("Video file is missing")
-    throw new ApiError(404, "Video file is missing")
+  if (!videoLocalPath) {
+    console.log("Video file is missing");
+    throw new ApiError(404, "Video file is missing");
   }
 
   let uploadedVideo;
-   try {
-    uploadedVideo = await uploadOnCloudinary(videoLocalPath)
-    console.log("Video uploaded")
-   } catch (error) {
-    throw new ApiError(400,"Error while uploading the file ", error)
-   }
+  try {
+    uploadedVideo = await uploadOnCloudinary(videoLocalPath);
+    console.log("Video uploaded");
+  } catch (error) {
+    throw new ApiError(400, "Error while uploading the file ", error);
+  }
 
-   if(!uploadedVideo){
-    throw new ApiError(400,"Error while uploading the file ")
-   }
+  if (!uploadedVideo) {
+    throw new ApiError(400, "Error while uploading the file");
+  }
 
-   const thumbnail = getVideoThumbnail(uploadedVideo.public_id)
+  const thumbnail = getVideoThumbnail(uploadedVideo.public_id);
 
-   const video = await Video.create({
+  const video = await Video.create({
     videoFile: uploadedVideo?.secure_url,
     thumbnail,
     owner: new mongoose.Types.ObjectId(loggedInUser),
     title,
     description,
-    duration:uploadedVideo.duration
-   })
+    duration: uploadedVideo.duration,
+  });
 
-   return res
-   .status(200)
-   .json(
-    new ApiResponse(200, video, "Video uploaded successfully")
-   )
+  return res
+    .status(200)
+    .json(new ApiResponse(200, video, "Video uploaded successfully"));
 });
 
 const getVideoById = asyncHandler(async (req, res) => {
@@ -80,7 +77,51 @@ const getVideoById = asyncHandler(async (req, res) => {
 
 const updateVideo = asyncHandler(async (req, res) => {
   const {videoId} = req.params;
-  //TODO: update video details like title, description, thumbnail
+  const {title, description} = req.body;
+  const loggedInUser = req.user?._id;
+  const thumbnailLocalPath = req.file?.path;
+
+  if (!isValidObjectId(videoId)) {
+    console.log("Invalid video Id");
+    throw new ApiError(400, "Invalid video Id");
+  }
+
+  if (!title || !description) {
+   if (thumbnailLocalPath && fs.existsSync(thumbnailLocalPath)) fs.unlinkSync(thumbnailLocalPath);
+    throw new ApiError(400, "Title and Description is missing");
+  }
+
+  const video = await Video.findById(videoId);
+
+  if (!video) {
+    console.log("Video not found");
+    if (thumbnailLocalPath && fs.existsSync(thumbnailLocalPath)) fs.unlinkSync(thumbnailLocalPath);
+    throw new ApiError(404, "Video not found");
+  }
+
+  if (video.owner.toString() !== loggedInUser.toString()) {
+    if (thumbnailLocalPath) fs.unlinkSync(thumbnailLocalPath);
+    console.log("Access denied");
+
+    throw new ApiError(403, "Access denied");
+  }
+
+  if (thumbnailLocalPath) {
+    const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
+    if (!thumbnail) {
+      throw new ApiError(500, "Error uploading thumbnail",);
+    }
+    video.thumbnail = thumbnail.secure_url;
+  }
+  
+  if (title) video.title = title.trim();
+  if (description) video.description = description.trim();
+
+  await video.save({validateBeforeSave: false});
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, video, "Video details updated successfully"));
 });
 
 const deleteVideo = asyncHandler(async (req, res) => {
