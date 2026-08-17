@@ -9,8 +9,77 @@ import {getVideoThumbnail} from "../utlils/cloudinary.js";
 import fs from "fs";
 
 const getAllVideos = asyncHandler(async (req, res) => {
-  const {page = 1, limit = 10, query, sortBy, sortType, userId} = req.query;
-  //TODO: get all videos based on query, sort, pagination
+  const {
+    page = 1,
+    limit = 10,
+    query,
+    sortBy = "createdAt",
+    sortType = "asc",
+    userId,
+  } = req.query;
+
+  const pipeline = [];
+
+  if (!isValidObjectId(userId)) {
+    console.log("Invalid user Id");
+    throw new ApiError(400, "Invalid user Id");
+  }
+
+  const user = await User.findById(userId).select("username fullName avatar");
+
+  if (!user) {
+    console.log("User doesn't exists");
+    throw new ApiError(404, "User doesn't exists");
+  }
+
+  pipeline.push({
+    $match: {
+      owner: new mongoose.Types.ObjectId(userId),
+    },
+  });
+
+  pipeline.push({
+    $match: {
+      isPublished: true,
+    },
+  });
+
+  if (query?.trim()) {
+    pipeline.push({
+      $match: {
+        $or: [
+          {title: {$regex: query?.trim(), $options: "i"}},
+          {description: {$regex: query?.trim(), options: "i"}},
+        ],
+      },
+    });
+  }
+
+  const sortDirection = sortType === "asc" ? 1 : -1;
+  pipeline.push({
+    $sort: {
+      [sortBy]: sortDirection,
+    },
+  });
+
+  const options = {
+    page: parseInt(page),
+    limit: parseInt(limit),
+    customLabels: {
+      totalDocs: "totalVideos",
+      docs: "videos",
+    },
+  };
+
+  // paginate
+  const videoAggregation = Video.aggregate(pipeline);
+  const result = await Video.aggregatePaginate(videoAggregation, options);
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, {user, ...result}, "Videos fetched successfully"),
+    );
 });
 
 const publishAVideo = asyncHandler(async (req, res) => {
@@ -87,7 +156,8 @@ const updateVideo = asyncHandler(async (req, res) => {
   }
 
   if (!title || !description) {
-   if (thumbnailLocalPath && fs.existsSync(thumbnailLocalPath)) fs.unlinkSync(thumbnailLocalPath);
+    if (thumbnailLocalPath && fs.existsSync(thumbnailLocalPath))
+      fs.unlinkSync(thumbnailLocalPath);
     throw new ApiError(400, "Title and Description is missing");
   }
 
@@ -95,7 +165,8 @@ const updateVideo = asyncHandler(async (req, res) => {
 
   if (!video) {
     console.log("Video not found");
-    if (thumbnailLocalPath && fs.existsSync(thumbnailLocalPath)) fs.unlinkSync(thumbnailLocalPath);
+    if (thumbnailLocalPath && fs.existsSync(thumbnailLocalPath))
+      fs.unlinkSync(thumbnailLocalPath);
     throw new ApiError(404, "Video not found");
   }
 
@@ -109,11 +180,11 @@ const updateVideo = asyncHandler(async (req, res) => {
   if (thumbnailLocalPath) {
     const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
     if (!thumbnail) {
-      throw new ApiError(500, "Error uploading thumbnail",);
+      throw new ApiError(500, "Error uploading thumbnail");
     }
     video.thumbnail = thumbnail.secure_url;
   }
-  
+
   if (title) video.title = title.trim();
   if (description) video.description = description.trim();
 
@@ -159,7 +230,7 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Video not found or you do not have permission");
   }
 
-  video.ispublished = !video.ispublished;
+  video.isPublished = !video.isPublished;
 
   await video.save({validateBeforeSave: false});
 
@@ -168,8 +239,8 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
     .json(
       new ApiResponse(
         200,
-        {ispublished: video.ispublished},
-        video.ispublished
+        {isPublished: video.isPublished},
+        video.isPublished
           ? "Video published Successfully"
           : "Video is now private",
       ),
