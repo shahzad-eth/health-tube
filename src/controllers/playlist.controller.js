@@ -104,54 +104,107 @@ const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
   const {playlistId, videoId} = req.params;
   const loggedInUser = req.user?._id;
 
-  if(!isValidObjectId(playlistId)){
-    console.log("Invalid playlist Id")
-    throw new ApiError(400,"Invalid playlist Id")
+  if (!isValidObjectId(playlistId)) {
+    console.log("Invalid playlist Id");
+    throw new ApiError(400, "Invalid playlist Id");
   }
 
-  if(!isValidObjectId(videoId)){
-    console.log("Invalid video Id")
-    throw new ApiError(400,"Invalid video Id")
+  if (!isValidObjectId(videoId)) {
+    console.log("Invalid video Id");
+    throw new ApiError(400, "Invalid video Id");
   }
 
-  const playlist = await Playlist.findById(playlistId)
+  const playlist = await Playlist.findById(playlistId);
 
   const updatedPlaylist = await Playlist.findByIdAndUpdate(
     {
-      _id:playlistId,
-      owner:loggedInUser
+      _id: playlistId,
+      owner: loggedInUser,
     },
     {
-      $pull:{videos:videoId}
+      $pull: {videos: videoId},
     },
-    {returnDocument:"after"}
-  )
-  
-  if(!updatePlaylist){
-    const existingPlaylist = await Playlist.exists({_id:playlistId})
-    if(!existingPlaylist){
+    {returnDocument: "after"},
+  );
+
+  if (!updatePlaylist) {
+    const existingPlaylist = await Playlist.exists({_id: playlistId});
+    if (!existingPlaylist) {
       console.log("Playlist not found");
-      throw new ApiError(404,"Playlist not found")
+      throw new ApiError(404, "Playlist not found");
     }
-    throw new ApiError(403,"Access Denied")
+    throw new ApiError(403, "Access Denied");
   }
 
   return res
-  .status(200)
-  .json(
-    new ApiResponse(200,updatePlaylist,"Video removed from playlist")
-  )
+    .status(200)
+    .json(new ApiResponse(200, updatePlaylist, "Video removed from playlist"));
 });
 
 const deletePlaylist = asyncHandler(async (req, res) => {
   const {playlistId} = req.params;
-  // TODO: delete playlist
+  const loggedInUser = req.user?._id;
+
+  if (!isValidObjectId(playlistId)) {
+    console.log("Invalid playlist Id");
+    throw new ApiError(400, "Invalid playlist Id");
+  }
+
+  const deletedPlaylist = await Playlist.findOneAndDelete({
+    _id: playlistId,
+    owner: loggedInUser,
+  });
+
+  if (!deletedPlaylist) {
+    const existingPlaylist = await Playlist.exists({_id: playlistId});
+    if (!existingPlaylist) {
+      console.log("Playlist doens't exists");
+      throw new ApiError(404, "Playlist doens't exists");
+    }
+    console.log("Access Denied");
+    throw new ApiError(403, "Access Denied");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Playlist deleted successfully"));
 });
 
 const updatePlaylist = asyncHandler(async (req, res) => {
   const {playlistId} = req.params;
   const {name, description} = req.body;
-  //TODO: update playlist
+  const loggedInUser = req.user?._id;
+
+  if (!isValidObjectId(playlistId)) {
+    console.log("Invalid playlist Id");
+    throw new ApiError(400, "Invalid playlist Id");
+  }
+
+  if (!name?.trim() && !description?.trim()) {
+    console.log("Title or description is required");
+    throw new ApiError(400, "Title or description is required");
+  }
+
+  const playlist = await Playlist.findById(playlistId);
+
+  if (!playlist) {
+    console.log("Playlist not found");
+    throw new ApiError(404, "Playlist not found");
+  }
+
+  if (playlist.owner.toString() !== loggedInUser?.toString()) {
+    console.log("Access Denied");
+    throw new ApiError(403, "Access Denied");
+  }
+
+  if (name.trim()) playlist.title = name.trim();
+  if (description.trim()) playlist.description = description.trim();
+
+  await playlist.save({validateBeforeSave: false});
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, playlist, "Playlist updated successfully"));
 });
 
 export {
